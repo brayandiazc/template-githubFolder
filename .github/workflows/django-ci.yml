@@ -1,0 +1,60 @@
+name: Django CI
+
+# Ejecuta el workflow en los eventos push y pull request en la rama 'main'.
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    # Especifica que se ejecutará en el sistema operativo Ubuntu en su última versión.
+    runs-on: ubuntu-latest
+
+    # Configura un servicio de base de datos PostgreSQL para pruebas.
+    services:
+      postgres:
+        image: postgres:12
+        env:
+          POSTGRES_DB: django_test # Nombre de la base de datos
+          POSTGRES_USER: django # Usuario de la base de datos
+          POSTGRES_PASSWORD: password # Contraseña para el usuario
+        ports:
+          - 5432:5432 # Expone el puerto 5432 para la base de datos
+        options: >-
+          --health-cmd "pg_isready -U django"      # Comando para verificar la salud de PostgreSQL
+          --health-interval 10s                    # Intervalo de verificación de salud
+          --health-timeout 5s                      # Tiempo de espera de la verificación
+          --health-retries 5                       # Número de reintentos de verificación de salud
+
+    steps:
+      - name: Checkout code
+        # Realiza el checkout del código en el repositorio actual.
+        uses: actions/checkout@v2
+
+      - name: Set up Python
+        # Configura la versión de Python (en este caso, la 3.8) para el entorno de ejecución.
+        uses: actions/setup-python@v2
+        with:
+          python-version: "3.8"
+
+      - name: Install dependencies
+        # Actualiza pip y luego instala las dependencias del archivo requirements.txt.
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run migrations
+        # Ejecuta las migraciones para configurar la base de datos antes de las pruebas.
+        env:
+          DATABASE_URL: postgres://django:password@localhost:5432/django_test
+        run: |
+          python manage.py migrate
+
+      - name: Run tests
+        # Ejecuta las pruebas unitarias de Django.
+        env:
+          DATABASE_URL: postgres://django:password@localhost:5432/django_test
+        run: |
+          python manage.py test
